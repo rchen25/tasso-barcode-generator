@@ -229,12 +229,21 @@
             background: #e94560;
             color: #fff;
         }
+        a {
+            color: #e94560;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        a:hover {
+            color: #ff6b8a;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Tasso Barcode Generator</h1>
-        <p>Generate barcode sticker sheets for Tasso blood collection devices. Upload CSV files containing barcode data and download a ready-to-print PDF formatted for Avery 5160 labels.</p>
+        <p>Generate barcode sticker sheets for Tasso blood collection devices. Upload CSV files containing barcode data and download a ready-to-print PDF formatted for <a href="https://www.avery.com/products/labels/5160" target="_blank">Avery 5160 labels</a>. You can also use <a href="https://www.uline.com/Product/Detail/S-5042/Laser-Labels/Uline-Laser-Labels-White-2-5-8-x-1" target="_blank">Uline S-5042 labels</a> which are compatible.</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
