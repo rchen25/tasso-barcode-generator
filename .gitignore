@@ -70,6 +70,7 @@ venv.bak/
 *.pdf
 *.csv
 !examples/*.csv
+!static/*.csv
 output/
 outputs/
 
