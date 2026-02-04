@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasso Barcode Generator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .flash.error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c00;
+        }
+        .flash.success {
+            background: #efe;
+            border: 1px solid #cfc;
+            color: #060;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        label {
+            font-weight: 600;
+            color: #555;
+        }
+        .file-input-wrapper {
+            position: relative;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            transition: border-color 0.3s, background-color 0.3s;
+            cursor: pointer;
+        }
+        .file-input-wrapper:hover {
+            border-color: #3498db;
+            background-color: #f8fbfe;
+        }
+        .file-input-wrapper.dragover {
+            border-color: #3498db;
+            background-color: #e8f4fc;
+        }
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-input-text {
+            color: #666;
+        }
+        .file-input-text strong {
+            color: #3498db;
+        }
+        .selected-files {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            display: none;
+        }
+        .selected-files.has-files {
+            display: block;
+        }
+        .selected-files ul {
+            margin: 5px 0 0 0;
+            padding-left: 20px;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .checkbox-group label {
+            font-weight: normal;
+            cursor: pointer;
+        }
+        button[type="submit"] {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button[type="submit"]:hover {
+            background: #2980b9;
+        }
+        button[type="submit"]:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .info {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e8f4fc;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .info ul {
+            margin-bottom: 0;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading .spinner {
+            display: inline-block;
+        }
+        .loading button[type="submit"] {
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tasso Barcode Generator</h1>
+        <p>Generate barcode sticker sheets for Tasso blood collection devices. Upload CSV files containing barcode data and download a ready-to-print PDF formatted for Avery 5160 labels.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="/generate" method="post" enctype="multipart/form-data" id="upload-form">
+            <div class="form-group">
+                <label>Upload CSV Files</label>
+                <div class="file-input-wrapper" id="drop-zone">
+                    <input type="file" name="csv_files" id="csv-files" multiple accept=".csv" required>
+                    <div class="file-input-text">
+                        <strong>Click to select files</strong> or drag and drop<br>
+                        <small>CSV files only (max 16MB total)</small>
+                    </div>
+                </div>
+                <div class="selected-files" id="selected-files">
+                    <strong>Selected files:</strong>
+                    <ul id="file-list"></ul>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Options</label>
+                <div class="options">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="include_header" name="include_header" checked>
+                        <label for="include_header">Include page header (source file info)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="include_id" name="include_id" checked>
+                        <label for="include_id">Include barcode ID text under each barcode</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="include_instruction" name="include_instruction" checked>
+                        <label for="include_instruction">Include instruction text ("scan in ARQ app...")</label>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" id="submit-btn">
+                Generate PDF
+                <span class="spinner"></span>
+            </button>
+        </form>
+
+        <div class="info">
+            <h3>CSV Format</h3>
+            <p>Your CSV file should have a header row with a <code>barcode</code> column:</p>
+            <pre><code>batchId,barcode,generatedOn
+batch1,ABC123-001,"11/21/2025"
+batch1,ABC123-002,"11/21/2025"</code></pre>
+            <p>Only the <code>barcode</code> column is required. Other columns are ignored.</p>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('csv-files');
+        const selectedFiles = document.getElementById('selected-files');
+        const fileList = document.getElementById('file-list');
+        const form = document.getElementById('upload-form');
+        const submitBtn = document.getElementById('submit-btn');
+
+        // Update file list display
+        function updateFileList() {
+            const files = fileInput.files;
+            fileList.innerHTML = '';
+
+            if (files.length > 0) {
+                selectedFiles.classList.add('has-files');
+                for (const file of files) {
+                    const li = document.createElement('li');
+                    li.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    fileList.appendChild(li);
+                }
+            } else {
+                selectedFiles.classList.remove('has-files');
+            }
+        }
+
+        fileInput.addEventListener('change', updateFileList);
+
+        // Drag and drop handling
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('dragover');
+            });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            fileInput.files = files;
+            updateFileList();
+        });
+
+        // Form submission loading state
+        form.addEventListener('submit', () => {
+            form.classList.add('loading');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Generating... <span class="spinner" style="display:inline-block;"></span>';
+        });
+    </script>
+</body>
+</html>
