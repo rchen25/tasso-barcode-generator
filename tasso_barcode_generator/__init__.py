@@ -33,16 +33,15 @@ class TassoBarcodeGenerator:
     ROWS = 10
     LABELS_PER_PAGE = COLS * ROWS  # 30 labels per page
 
-    # Margins and spacing
-    LEFT_MARGIN = 0.05 * inch
+    # Margins and spacing (Avery 5160 standard)
+    LEFT_MARGIN = 0.1875 * inch  # 3/16" standard left margin
     TOP_MARGIN = 0.5 * inch
     HORIZONTAL_PITCH = 2.75 * inch
     VERTICAL_PITCH = 1.0 * inch
 
     # Barcode specifications
-    SIDE_MARGIN = 0.138 * inch  # ~3.5mm margin on each side
+    SIDE_MARGIN = 0.1 * inch  # padding within each label
     BARCODE_HEIGHT = 0.4 * inch
-    BARCODE_X_OFFSET = -0.157 * inch  # 4mm left shift for alignment
 
     def __init__(self, output_path=DEFAULT_OUTPUT):
         """Initialize the generator with an output path."""
@@ -85,15 +84,21 @@ class TassoBarcodeGenerator:
         """Add a barcode to a label position."""
         try:
             barcode_width = self.LABEL_WIDTH - 2 * self.SIDE_MARGIN
+            
+            # Code128 structure: start(11) + chars(11 each) + checksum(11) + stop(13)
+            total_modules = 11 * len(barcode_text) + 35
+            bar_width = barcode_width / total_modules
+            
             barcode = code128.Code128(
                 barcode_text,
-                barWidth=barcode_width / len(barcode_text) / 11 * 0.9,
+                barWidth=bar_width,
                 height=self.BARCODE_HEIGHT,
                 humanReadable=False,
             )
 
-            # Position barcode (centered with left offset)
-            bx = x + (self.LABEL_WIDTH - barcode_width) / 2 + self.BARCODE_X_OFFSET
+            # Center barcode within label
+            actual_width = barcode.width
+            bx = x + (self.LABEL_WIDTH - actual_width) / 2
             by = y + (self.LABEL_HEIGHT - self.BARCODE_HEIGHT) / 2 + 0.05 * inch
             barcode.drawOn(self.canvas, bx, by)
 
