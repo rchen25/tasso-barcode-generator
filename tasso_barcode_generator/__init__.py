@@ -72,12 +72,12 @@ class TassoBarcodeGenerator:
         y2 = self.PAGE_HEIGHT - 0.42 * inch
         center_x = self.PAGE_WIDTH / 2
 
-        self.canvas.setFont("Helvetica-Bold", 8)
+        self.canvas.setFont("Times-Bold", 8)
         self.canvas.drawCentredString(
             center_x, y1, "One barcode per Tasso foil pouch. To be scanned via the ARQ app."
         )
 
-        self.canvas.setFont("Helvetica", 7)
+        self.canvas.setFont("Times-Roman", 7)
         self.canvas.drawCentredString(center_x, y2, f"Source: {csv_filename}")
 
     def _add_barcode(self, x, y, barcode_text, include_id, include_instruction):
@@ -104,14 +104,14 @@ class TassoBarcodeGenerator:
 
             # Barcode ID text
             if include_id:
-                self.canvas.setFont("Helvetica", 6)
+                self.canvas.setFont("Times-Roman", 6)
                 self.canvas.drawCentredString(
                     x + self.LABEL_WIDTH / 2, by - 0.08 * inch, barcode_text
                 )
 
             # Instruction text
             if include_instruction:
-                self.canvas.setFont("Helvetica", 5.5)
+                self.canvas.setFont("Times-Roman", 5.5)
                 self.canvas.drawCentredString(
                     x + self.LABEL_WIDTH / 2,
                     y + 0.05 * inch,
@@ -120,7 +120,7 @@ class TassoBarcodeGenerator:
 
         except Exception as e:
             print(f"    Error generating barcode for '{barcode_text}': {e}")
-            self.canvas.setFont("Helvetica", 6)
+            self.canvas.setFont("Times-Roman", 6)
             self.canvas.drawString(
                 x + 0.05 * inch, y + self.LABEL_HEIGHT / 2, f"Error: {barcode_text[:20]}"
             )
