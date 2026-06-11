@@ -39,9 +39,19 @@ class TassoBarcodeGenerator:
     HORIZONTAL_PITCH = 2.75 * inch
     VERTICAL_PITCH = 1.0 * inch
 
-    # Barcode specifications
-    SIDE_MARGIN = 0.1 * inch  # padding within each label
-    BARCODE_HEIGHT = 0.4 * inch
+    # Label internal layout
+    #
+    # Each label is divided horizontally in half:
+    #   - Top half  : blank "Write your name ____" field for the participant to fill in
+    #   - Bottom half: barcode + (optional) human-readable ID
+    #
+    # The barcode height was reduced from 0.4" to 0.25" so it fits comfortably
+    # in the bottom half together with the ID text. Side margins (left/right
+    # padding inside each label) are kept the same.
+    SIDE_MARGIN = 0.1 * inch
+    BARCODE_HEIGHT = 0.25 * inch
+    NAME_FIELD_BASELINE = 0.62 * inch  # y-offset within the label for the writing line
+    NAME_LABEL_FONT_SIZE = 7
 
     def __init__(self, output_path=DEFAULT_OUTPUT):
         """Initialize the generator with an output path."""
@@ -80,15 +90,49 @@ class TassoBarcodeGenerator:
         self.canvas.setFont("Times-Roman", 7)
         self.canvas.drawCentredString(center_x, y2, f"Source: {csv_filename}")
 
+    def _add_name_field(self, x, y):
+        """Draw the top-half "Write your name __________" writing field."""
+        label_x = x + self.SIDE_MARGIN
+        baseline_y = y + self.NAME_FIELD_BASELINE
+        self.canvas.setFont("Times-Roman", self.NAME_LABEL_FONT_SIZE)
+        prefix = "Write your name"
+        self.canvas.drawString(label_x, baseline_y, prefix)
+
+        # Horizontal underline starts just to the right of the prefix and runs
+        # to the inside of the right-hand margin. ReportLab's string width API
+        # gives us the exact pixel width of the rendered prefix so the line
+        # never overlaps the text regardless of font choice.
+        prefix_width = self.canvas.stringWidth(
+            prefix + " ", "Times-Roman", self.NAME_LABEL_FONT_SIZE
+        )
+        line_start_x = label_x + prefix_width
+        line_end_x = x + self.LABEL_WIDTH - self.SIDE_MARGIN
+        # Drop the line ~1pt below the text baseline so descenders ("y", "g")
+        # the user writes still sit on the line cleanly.
+        line_y = baseline_y - 1
+        self.canvas.setLineWidth(0.5)
+        self.canvas.line(line_start_x, line_y, line_end_x, line_y)
+
     def _add_barcode(self, x, y, barcode_text, include_id, include_instruction):
-        """Add a barcode to a label position."""
+        """Add a barcode to the bottom half of a label position.
+
+        Beneath the barcode we draw a single small caption line. The caption
+        combines (depending on the flags):
+          * ``include_id`` only        -> "wBxNRDOK-2"
+          * ``include_instruction`` only -> "scan in ARQ app after taking blood sample"
+          * both (the default)         -> "wBxNRDOK-2 / scan in ARQ app after taking blood sample"
+
+        Collapsing the two strings into one caption line keeps everything in
+        the bottom half so the top half stays clear for the handwritten Name
+        field.
+        """
         try:
             barcode_width = self.LABEL_WIDTH - 2 * self.SIDE_MARGIN
-            
+
             # Code128 structure: start(11) + chars(11 each) + checksum(11) + stop(13)
             total_modules = 11 * len(barcode_text) + 35
             bar_width = barcode_width / total_modules
-            
+
             barcode = code128.Code128(
                 barcode_text,
                 barWidth=bar_width,
@@ -96,33 +140,45 @@ class TassoBarcodeGenerator:
                 humanReadable=False,
             )
 
-            # Center barcode within label
+            # Center barcode horizontally; place it in the BOTTOM half so the
+            # top half stays clear for the handwritten Name field.
             actual_width = barcode.width
             bx = x + (self.LABEL_WIDTH - actual_width) / 2
-            by = y + (self.LABEL_HEIGHT - self.BARCODE_HEIGHT) / 2 + 0.05 * inch
+            # Bottom-half centre minus half the barcode height, then nudge up
+            # by ~0.05" to leave room for the caption text below.
+            by = y + (self.LABEL_HEIGHT / 4) - (self.BARCODE_HEIGHT / 2) + 0.06 * inch
             barcode.drawOn(self.canvas, bx, by)
 
-            # Barcode ID text
+            # Combined caption (ID + instruction) on a single line
+            caption_parts = []
             if include_id:
-                self.canvas.setFont("Times-Roman", 6)
-                self.canvas.drawCentredString(
-                    x + self.LABEL_WIDTH / 2, by - 0.08 * inch, barcode_text
-                )
-
-            # Instruction text
+                caption_parts.append(barcode_text)
             if include_instruction:
-                self.canvas.setFont("Times-Roman", 5.5)
+                caption_parts.append("scan in ARQ app after taking blood sample")
+
+            if caption_parts:
+                caption = " / ".join(caption_parts)
+                # Auto-shrink the font until the caption fits inside the
+                # available label width (minus side margins). Starts at 6pt
+                # and steps down to 5pt; the full ID + instruction string at
+                # 5.5pt comfortably fits a 2.625" Avery 5160 label.
+                font_size = 6.0
+                available_w = self.LABEL_WIDTH - 2 * self.SIDE_MARGIN
+                while font_size > 4.5:
+                    text_w = self.canvas.stringWidth(caption, "Times-Roman", font_size)
+                    if text_w <= available_w:
+                        break
+                    font_size -= 0.5
+                self.canvas.setFont("Times-Roman", font_size)
                 self.canvas.drawCentredString(
-                    x + self.LABEL_WIDTH / 2,
-                    y + 0.05 * inch,
-                    "scan in ARQ app after taking blood sample",
+                    x + self.LABEL_WIDTH / 2, by - 0.08 * inch, caption
                 )
 
         except Exception as e:
             print(f"    Error generating barcode for '{barcode_text}': {e}")
             self.canvas.setFont("Times-Roman", 6)
             self.canvas.drawString(
-                x + 0.05 * inch, y + self.LABEL_HEIGHT / 2, f"Error: {barcode_text[:20]}"
+                x + 0.05 * inch, y + self.LABEL_HEIGHT / 4, f"Error: {barcode_text[:20]}"
             )
 
     def _process_csv(self, csv_path, include_header, include_id, include_instruction):
@@ -156,6 +212,9 @@ class TassoBarcodeGenerator:
                     x = self.LEFT_MARGIN + col * self.HORIZONTAL_PITCH
                     y = self.PAGE_HEIGHT - self.TOP_MARGIN - row * self.VERTICAL_PITCH - self.LABEL_HEIGHT
 
+                    # Top half: handwritten Name field
+                    self._add_name_field(x, y)
+                    # Bottom half: barcode (+ optional ID)
                     self._add_barcode(x, y, barcodes[idx], include_id, include_instruction)
                     idx += 1
 
